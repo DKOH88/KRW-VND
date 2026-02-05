@@ -879,6 +879,53 @@
                 grid-template-columns: repeat(2, 1fr);
             }
         }
+
+        /* Bank Buttons in Modal */
+        .bank-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .bank-btn {
+            padding: 16px;
+            border-radius: 12px;
+            border: none;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .bank-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .bank-shinhan {
+            background: linear-gradient(135deg, #2b64ce 0%, #0046b6 100%);
+        }
+
+        .bank-kb {
+            background: linear-gradient(135deg, #ffbc00 0%, #ff9e00 100%);
+            color: #4a4a4a;
+        }
+
+        .bank-woori {
+            background: linear-gradient(135deg, #0083ca 0%, #e1f5fe 100%);
+            color: #005691;
+        }
+
+        .bank-hana {
+            background: linear-gradient(135deg, #009490 0%, #007571 100%);
+        }
     </style>
 </head>
 
@@ -987,6 +1034,12 @@
                     </svg>
                     환율 차트
                 </button>
+                <button class="feature-btn bank" id="openBankBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 21h18M5 21V7l8-4 8 4v14M8 21v-9a4 4 0 0 1 8 0v9" />
+                    </svg>
+                    은행별 환율
+                </button>
                 <button class="feature-btn alert" id="openAlertBtn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -1058,6 +1111,48 @@
             </div>
         </div>
     </div>
+
+    <!-- Bank Modal -->
+    <div class="modal-overlay" id="bankModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">🏦 은행별 환율 확인</h3>
+                <button class="modal-close" id="closeBankBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="form-note" style="margin-bottom: 20px;">
+                    각 은행의 공식 환율 페이지로 이동합니다.
+                </p>
+                <div class="bank-grid">
+                    <a href="https://bank.shinhan.com/index.jsp#020501010000" target="_blank"
+                        class="bank-btn bank-shinhan">
+                        <span>신한은행</span>
+                        <span style="font-size: 11px; opacity: 0.8;">Shinhan Bank</span>
+                    </a>
+                    <a href="https://obank.kbstar.com/quics?page=C101423" target="_blank" class="bank-btn bank-kb">
+                        <span>KB국민은행</span>
+                        <span style="font-size: 11px; opacity: 0.8;">KB Kookmin Bank</span>
+                    </a>
+                    <a href="https://spot.wooribank.com/pot/Dream?withyou=FXXRT0014" target="_blank"
+                        class="bank-btn bank-woori">
+                        <span>우리은행</span>
+                        <span style="font-size: 11px; opacity: 0.8;">Woori Bank</span>
+                    </a>
+                    <a href="https://www.kebhana.com/cms/rate/index.do?contentUrl=/cms/rate/wpfxd651_01i.do"
+                        target="_blank" class="bank-btn bank-hana">
+                        <span>하나은행</span>
+                        <span style="font-size: 11px; opacity: 0.8;">Hana Bank</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
 
     <!-- Alert Modal -->
     <div class="modal-overlay" id="alertModal">
@@ -1775,6 +1870,7 @@
         // =====================
         const chartModal = document.getElementById('chartModal');
         const alertModal = document.getElementById('alertModal');
+        const bankModal = document.getElementById('bankModal');
 
         document.getElementById('openChartBtn').addEventListener('click', () => {
             chartModal.classList.add('active');
@@ -1783,6 +1879,14 @@
 
         document.getElementById('closeChartBtn').addEventListener('click', () => {
             chartModal.classList.remove('active');
+        });
+
+        document.getElementById('openBankBtn').addEventListener('click', () => {
+            bankModal.classList.add('active');
+        });
+
+        document.getElementById('closeBankBtn').addEventListener('click', () => {
+            bankModal.classList.remove('active');
         });
 
         document.getElementById('openAlertBtn').addEventListener('click', () => {
@@ -1795,7 +1899,7 @@
         });
 
         // Close modals when clicking overlay
-        [chartModal, alertModal].forEach(modal => {
+        [chartModal, alertModal, bankModal].forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     modal.classList.remove('active');
