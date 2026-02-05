@@ -966,7 +966,7 @@
                     </div>
                 </div>
 
-                <button class="swap-button" id="swapBtn" title="환율 전환">
+                <button class="swap-button" id="swapBtn" title="초기화">
                     <svg viewBox="0 0 24 24">
                         <path d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18m-6-9L19.5 3m0 0L15 7.5M19.5 3v18" />
                     </svg>
@@ -1350,13 +1350,11 @@
             isUpdating = false;
         });
 
-        // Swap button handler
+        // Reset button handler (formerly Swap)
         swapBtn.addEventListener('click', function () {
-            const krwValue = krwInput.value;
-            const vndValue = vndInput.value;
-
-            krwInput.value = vndValue;
-            vndInput.value = krwValue;
+            krwInput.value = '';
+            vndInput.value = '';
+            krwInput.focus();
         });
 
         // Quick button handlers
