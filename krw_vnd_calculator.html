@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRW ↔ VND 환율 계산기</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- Chart.js for exchange rate chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.75);
+            --krw-color: #4facfe;
+            --vnd-color: #f5576c;
+            --success-glow: 0 0 30px rgba(79, 172, 254, 0.4);
+            --danger-glow: 0 0 30px rgba(245, 87, 108, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* Animated background orbs */
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            animation: float 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary-gradient);
+            top: -100px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--secondary-gradient);
+            bottom: -50px;
+            right: -50px;
+            animation-delay: 2s;
+        }
+
+        .orb-3 {
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: 4s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(30px, -30px) scale(1.1);
+            }
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 32px;
+            padding: 40px 32px;
+            box-shadow:
+                0 25px 50px -12px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Header Section */
+        .header {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+
+        .header-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+        }
+
+        .exchange-rate {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .rate-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 20px;
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .rate-badge.krw {
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.2) 0%, rgba(102, 126, 234, 0.2) 100%);
+            border: 1px solid rgba(79, 172, 254, 0.3);
+        }
+
+        .rate-badge.vnd {
+            background: linear-gradient(135deg, rgba(245, 87, 108, 0.2) 0%, rgba(240, 147, 251, 0.2) 100%);
+            border: 1px solid rgba(245, 87, 108, 0.3);
+        }
+
+        .rate-badge:hover {
+            transform: translateY(-2px);
+        }
+
+        .rate-currency {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .rate-badge.krw .rate-currency {
+            color: var(--krw-color);
+        }
+
+        .rate-badge.vnd .rate-currency {
+            color: var(--vnd-color);
+        }
+
+        .rate-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .rate-divider {
+            font-size: 24px;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+
+        .last-update {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .update-indicator {
+            width: 6px;
+            height: 6px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* Currency Input Section */
+        .currency-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+            border: 2px solid transparent;
+            border-radius: 20px;
+            padding: 4px;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--glass-border);
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+        }
+
+        .input-wrapper.krw-focus:focus-within {
+            border-color: var(--krw-color);
+            box-shadow: var(--success-glow);
+        }
+
+        .input-wrapper.vnd-focus:focus-within {
+            border-color: var(--vnd-color);
+            box-shadow: var(--danger-glow);
+        }
+
+        .currency-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 56px;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            border-radius: 16px;
+            flex-shrink: 0;
+        }
+
+        .currency-label.krw {
+            background: linear-gradient(135deg, var(--krw-color) 0%, #667eea 100%);
+            color: white;
+        }
+
+        .currency-label.vnd {
+            background: linear-gradient(135deg, var(--vnd-color) 0%, #f093fb 100%);
+            color: white;
+        }
+
+        .currency-input {
+            flex: 1;
+            min-width: 0;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 16px 20px;
+            font-size: 24px;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-primary);
+            text-align: right;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .currency-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .currency-input::-webkit-inner-spin-button,
+        .currency-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .swap-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            margin: -8px auto;
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            z-index: 5;
+            position: relative;
+        }
+
+        .swap-button:hover {
+            transform: rotate(180deg) scale(1.1);
+        }
+
+        .swap-button svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        /* Quick Buttons Section */
+        .quick-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .button-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .section-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .section-label::before {
+            content: '';
+            width: 16px;
+            height: 2px;
+            border-radius: 1px;
+        }
+
+        .section-label.krw::before {
+            background: var(--krw-color);
+        }
+
+        .section-label.vnd::before {
+            background: var(--vnd-color);
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .button-grid.vnd {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .quick-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 14px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quick-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .quick-btn.krw::before {
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.2) 0%, rgba(102, 126, 234, 0.2) 100%);
+        }
+
+        .quick-btn.vnd::before {
+            background: linear-gradient(135deg, rgba(245, 87, 108, 0.2) 0%, rgba(240, 147, 251, 0.2) 100%);
+        }
+
+        .quick-btn:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .quick-btn:hover::before {
+            opacity: 1;
+        }
+
+        .quick-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-amount {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-result {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            position: relative;
+            z-index: 1;
+            min-height: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .quick-btn.krw:hover .btn-result,
+        .quick-btn.krw.active .btn-result {
+            color: var(--krw-color);
+        }
+
+        .quick-btn.vnd:hover .btn-result,
+        .quick-btn.vnd.active .btn-result {
+            color: var(--vnd-color);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .footer-text {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .api-note {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 8px;
+        }
+
+        /* Loading Animation */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .rate-value.updating {
+            animation: blink 0.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* Feature Buttons */
+        .feature-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .feature-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .feature-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .feature-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .feature-btn.chart {
+            color: #4facfe;
+        }
+
+        .feature-btn.alert {
+            color: #f5576c;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 50%;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(245, 87, 108, 0.3);
+            color: #f5576c;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 16px;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .chart-btn {
+            flex: 1;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .chart-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .chart-btn.active {
+            background: var(--primary-gradient);
+            border-color: transparent;
+            color: white;
+        }
+
+        .chart-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .stat-card {
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .stat-value.high {
+            color: #f5576c;
+        }
+
+        .stat-value.low {
+            color: #4ade80;
+        }
+
+        .chart-note {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        /* Data Management Buttons */
+        .data-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .data-btn {
+            flex: 1;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .data-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .data-btn.export {
+            border-color: rgba(79, 172, 254, 0.3);
+        }
+
+        .data-btn.export:hover {
+            background: rgba(79, 172, 254, 0.15);
+            border-color: rgba(79, 172, 254, 0.5);
+            color: #4facfe;
+        }
+
+        .data-btn.import {
+            border-color: rgba(74, 222, 128, 0.3);
+        }
+
+        .data-btn.import:hover {
+            background: rgba(74, 222, 128, 0.15);
+            border-color: rgba(74, 222, 128, 0.5);
+            color: #4ade80;
+        }
+
+        #importFileInput {
+            display: none;
+        }
+
+        /* Alert Form */
+        .alert-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            padding: 14px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-primary);
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            border-color: var(--krw-color);
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-note {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            line-height: 1.5;
+        }
+
+        .submit-btn {
+            padding: 16px;
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .alert-status {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            text-align: center;
+            display: none;
+        }
+
+        .alert-status.success {
+            display: block;
+            background: rgba(74, 222, 128, 0.2);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+            color: #4ade80;
+        }
+
+        .alert-status.error {
+            display: block;
+            background: rgba(245, 87, 108, 0.2);
+            border: 1px solid rgba(245, 87, 108, 0.3);
+            color: #f5576c;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .card {
+                padding: 28px 20px;
+                border-radius: 24px;
+            }
+
+            .rate-value {
+                font-size: 24px;
+            }
+
+            .currency-input {
+                font-size: 20px;
+                padding: 12px 16px;
+            }
+
+            .currency-label {
+                width: 70px;
+                height: 50px;
+                font-size: 13px;
+            }
+
+            .button-grid.vnd {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Animated Background Orbs -->
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <div class="container">
+        <div class="card">
+            <!-- Header with Exchange Rate -->
+            <div class="header">
+                <div class="header-title">실시간 환율</div>
+                <div class="exchange-rate">
+                    <div class="rate-badge krw">
+                        <span class="rate-currency">100VND</span>
+                        <span class="rate-value" id="krwRate">5.56</span>
+                    </div>
+                    <span class="rate-divider">/</span>
+                    <div class="rate-badge vnd">
+                        <span class="rate-currency">1KRW</span>
+                        <span class="rate-value" id="vndRate">17.70</span>
+                    </div>
+                </div>
+                <div class="last-update">
+                    <span class="update-indicator"></span>
+                    <span id="lastUpdate">마지막 업데이트: --:--:--</span>
+                </div>
+            </div>
+
+            <!-- Currency Inputs -->
+            <div class="currency-inputs">
+                <div class="input-group">
+                    <div class="input-wrapper krw-focus">
+                        <div class="currency-label krw">KRW</div>
+                        <input type="text" class="currency-input" id="krwInput" placeholder="0" inputmode="numeric">
+                    </div>
+                </div>
+
+                <button class="swap-button" id="swapBtn" title="환율 전환">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18m-6-9L19.5 3m0 0L15 7.5M19.5 3v18" />
+                    </svg>
+                </button>
+
+                <div class="input-group">
+                    <div class="input-wrapper vnd-focus">
+                        <div class="currency-label vnd">VND</div>
+                        <input type="text" class="currency-input" id="vndInput" placeholder="0" inputmode="numeric">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Buttons -->
+            <div class="quick-buttons">
+                <!-- KRW Quick Buttons -->
+                <div class="button-section">
+                    <div class="section-label krw">한국 원화 (₩)</div>
+                    <div class="button-grid">
+                        <button class="quick-btn krw" data-amount="10000">
+                            <span class="btn-amount">1만원</span>
+                            <span class="btn-result" id="result-10000">-</span>
+                        </button>
+                        <button class="quick-btn krw" data-amount="50000">
+                            <span class="btn-amount">5만원</span>
+                            <span class="btn-result" id="result-50000">-</span>
+                        </button>
+                        <button class="quick-btn krw" data-amount="100000">
+                            <span class="btn-amount">10만원</span>
+                            <span class="btn-result" id="result-100000">-</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- VND Quick Buttons -->
+                <div class="button-section">
+                    <div class="section-label vnd">베트남 동 (₫)</div>
+                    <div class="button-grid vnd">
+                        <button class="quick-btn vnd" data-amount="50000">
+                            <span class="btn-amount">5만동</span>
+                            <span class="btn-result" id="result-vnd-50000">-</span>
+                        </button>
+                        <button class="quick-btn vnd" data-amount="100000">
+                            <span class="btn-amount">10만동</span>
+                            <span class="btn-result" id="result-vnd-100000">-</span>
+                        </button>
+                        <button class="quick-btn vnd" data-amount="200000">
+                            <span class="btn-amount">20만동</span>
+                            <span class="btn-result" id="result-vnd-200000">-</span>
+                        </button>
+                        <button class="quick-btn vnd" data-amount="500000">
+                            <span class="btn-amount">50만동</span>
+                            <span class="btn-result" id="result-vnd-500000">-</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature Buttons -->
+            <div class="feature-buttons">
+                <button class="feature-btn chart" id="openChartBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18" />
+                        <path d="M18 9l-5 5-4-4-3 3" />
+                    </svg>
+                    환율 차트
+                </button>
+                <button class="feature-btn alert" id="openAlertBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    환율 알림
+                </button>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <p class="footer-text">
+                    1 KRW = <span id="footerRate">약 17.70 VND</span>
+                </p>
+                <p class="api-note">환율은 10분마다 자동 업데이트됩니다</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Modal -->
+    <div class="modal-overlay" id="chartModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">📈 KRW/VND 환율 변동 차트</h3>
+                <button class="modal-close" id="closeChartBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="chart-controls">
+                    <button class="chart-btn active" id="chart7d" data-days="7">1주일</button>
+                    <button class="chart-btn" id="chart30d" data-days="30">30일</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="rateChart"></canvas>
+                </div>
+                <div class="chart-stats">
+                    <div class="stat-card">
+                        <div class="stat-label">📈 최고점 (1KRW)</div>
+                        <div class="stat-value high" id="statHigh">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📉 최저점 (1KRW)</div>
+                        <div class="stat-value low" id="statLow">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📈 최고점 (100VND)</div>
+                        <div class="stat-value high" id="statHighVnd">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📉 최저점 (100VND)</div>
+                        <div class="stat-value low" id="statLowVnd">-</div>
+                    </div>
+                </div>
+                <p class="chart-note">* KRW→VND 및 VND→KRW 환율 변동 추이</p>
+
+                <!-- Data Management Buttons -->
+                <div class="data-buttons">
+                    <button class="data-btn export" id="exportDataBtn">
+                        📤 데이터 내보내기
+                    </button>
+                    <button class="data-btn import" id="importDataBtn">
+                        📥 데이터 불러오기
+                    </button>
+                    <input type="file" id="importFileInput" accept=".json">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div class="modal-overlay" id="alertModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">🔔 목표 환율 알림 설정</h3>
+                <button class="modal-close" id="closeAlertBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form class="alert-form" id="alertForm">
+                    <div class="form-group">
+                        <label class="form-label">환율 기준</label>
+                        <select class="form-input" id="rateType">
+                            <option value="krw">1KRW → VND</option>
+                            <option value="vnd">100VND → KRW</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" id="targetRateLabel">목표 환율</label>
+                            <input type="number" class="form-input" id="targetRate" placeholder="18.00" step="0.01"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">알림 조건</label>
+                            <select class="form-input" id="alertCondition">
+                                <option value="above">이상일 때</option>
+                                <option value="below">이하일 때</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="form-note">
+                        💡 목표 환율에 도달하면 텔레그램으로 알림을 보내드립니다.
+                    </p>
+                    <div class="alert-status" id="alertStatus"></div>
+                    <button type="submit" class="submit-btn" id="saveAlertBtn">알림 설정 저장</button>
+                    <button type="button" class="submit-btn" id="testAlertBtn"
+                        style="background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);">테스트 알림 보내기</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Exchange rate configuration
+        // 5.56 = 100동 기준 원화 (100 VND = 5.56 KRW)
+        // 17.70 = 1원 기준 동화 (1 KRW = 17.70 VND)
+        let exchangeRates = {
+            vnd100ToKrw: 5.56,    // 100 VND = 5.56 KRW
+            krw1ToVnd: 17.70      // 1 KRW = 17.70 VND
+        };
+
+        // Format number with commas
+        function formatNumber(num) {
+            if (isNaN(num) || num === 0) return '0';
+            return Math.round(num).toLocaleString('ko-KR');
+        }
+
+        // Format for display with unit
+        function formatWithUnit(num, currency) {
+            const formatted = formatNumber(num);
+            if (currency === 'VND') {
+                return formatted + ' ₫';
+            } else {
+                return '₩' + formatted;
+            }
+        }
+
+        // Parse formatted number
+        function parseFormattedNumber(str) {
+            if (!str) return 0;
+            return parseFloat(str.replace(/[^0-9.-]/g, '')) || 0;
+        }
+
+        // Update exchange rates display
+        function updateRateDisplay() {
+            document.getElementById('krwRate').textContent = exchangeRates.vnd100ToKrw.toFixed(2);
+            document.getElementById('vndRate').textContent = exchangeRates.krw1ToVnd.toFixed(2);
+            document.getElementById('footerRate').textContent = `약 ${exchangeRates.krw1ToVnd.toFixed(2)} VND`;
+
+            // Update quick button results
+            updateQuickButtonResults();
+
+            // Update last update time
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('lastUpdate').textContent = `마지막 업데이트: ${timeStr}`;
+        }
+
+        // Update quick button result values
+        function updateQuickButtonResults() {
+            // KRW to VND buttons (1 KRW = 17.70 VND)
+            [10000, 50000, 100000].forEach(amount => {
+                const vnd = amount * exchangeRates.krw1ToVnd;
+                document.getElementById(`result-${amount}`).textContent = formatNumber(vnd) + '₫';
+            });
+
+            // VND to KRW buttons (100 VND = 5.56 KRW, so 1 VND = 0.0556 KRW)
+            [50000, 100000, 200000, 500000].forEach(amount => {
+                const krw = (amount / 100) * exchangeRates.vnd100ToKrw;
+                document.getElementById(`result-vnd-${amount}`).textContent = '₩' + formatNumber(krw);
+            });
+        }
+
+        // Fetch real exchange rates (using free API)
+        async function fetchExchangeRates() {
+            try {
+                // Show updating state
+                document.querySelectorAll('.rate-value').forEach(el => el.classList.add('updating'));
+
+                // Using ExchangeRate-API (free tier)
+                const response = await fetch('https://api.exchangerate-api.com/v4/latest/KRW');
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Get VND rate against KRW
+                    const vndPerKrw = data.rates.VND; // 1 KRW = X VND
+
+                    // Update exchange rates
+                    exchangeRates.krw1ToVnd = vndPerKrw;
+                    exchangeRates.vnd100ToKrw = 100 / vndPerKrw; // 100 VND = X KRW
+
+                    console.log('Exchange rates updated:', exchangeRates);
+                }
+            } catch (error) {
+                console.log('API fetch failed, using default rates:', error);
+                // Keep using default/previous rates
+            } finally {
+                document.querySelectorAll('.rate-value').forEach(el => el.classList.remove('updating'));
+                updateRateDisplay();
+
+                // Save current rate to history (for chart)
+                saveCurrentRate();
+            }
+        }
+
+        // Convert KRW to VND (1 KRW = 17.70 VND)
+        function convertKrwToVnd(krw) {
+            return krw * exchangeRates.krw1ToVnd;
+        }
+
+        // Convert VND to KRW (100 VND = 5.56 KRW)
+        function convertVndToKrw(vnd) {
+            return (vnd / 100) * exchangeRates.vnd100ToKrw;
+        }
+
+        // DOM Elements
+        const krwInput = document.getElementById('krwInput');
+        const vndInput = document.getElementById('vndInput');
+        const swapBtn = document.getElementById('swapBtn');
+
+        // Input event handlers
+        let isUpdating = false;
+
+        krwInput.addEventListener('input', function (e) {
+            if (isUpdating) return;
+            isUpdating = true;
+
+            let value = this.value.replace(/[^0-9]/g, '');
+            const numValue = parseInt(value) || 0;
+
+            this.value = numValue ? formatNumber(numValue) : '';
+
+            if (numValue > 0) {
+                const vnd = convertKrwToVnd(numValue);
+                vndInput.value = formatNumber(vnd);
+            } else {
+                vndInput.value = '';
+            }
+
+            isUpdating = false;
+        });
+
+        vndInput.addEventListener('input', function (e) {
+            if (isUpdating) return;
+            isUpdating = true;
+
+            let value = this.value.replace(/[^0-9]/g, '');
+            const numValue = parseInt(value) || 0;
+
+            this.value = numValue ? formatNumber(numValue) : '';
+
+            if (numValue > 0) {
+                const krw = convertVndToKrw(numValue);
+                krwInput.value = formatNumber(krw);
+            } else {
+                krwInput.value = '';
+            }
+
+            isUpdating = false;
+        });
+
+        // Swap button handler
+        swapBtn.addEventListener('click', function () {
+            const krwValue = krwInput.value;
+            const vndValue = vndInput.value;
+
+            krwInput.value = vndValue;
+            vndInput.value = krwValue;
+        });
+
+        // Quick button handlers
+        document.querySelectorAll('.quick-btn.krw').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const amount = parseInt(this.dataset.amount);
+                const vnd = convertKrwToVnd(amount);
+
+                krwInput.value = formatNumber(amount);
+                vndInput.value = formatNumber(vnd);
+
+                // Visual feedback
+                this.classList.add('active');
+                setTimeout(() => this.classList.remove('active'), 300);
+            });
+        });
+
+        document.querySelectorAll('.quick-btn.vnd').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const amount = parseInt(this.dataset.amount);
+                const krw = convertVndToKrw(amount);
+
+                vndInput.value = formatNumber(amount);
+                krwInput.value = formatNumber(krw);
+
+                // Visual feedback
+                this.classList.add('active');
+                setTimeout(() => this.classList.remove('active'), 300);
+            });
+        });
+
+        // =====================
+        // Chart Functionality
+        // =====================
+        let rateChart = null;
+        let currentChartDays = 7;
+
+        // =====================
+        // Historical Data Storage (localStorage)
+        // =====================
+        const HISTORY_STORAGE_KEY = 'krwVndRateHistory';
+
+        // Load historical data from localStorage
+        function loadHistoricalRates() {
+            try {
+                const data = localStorage.getItem(HISTORY_STORAGE_KEY);
+                return data ? JSON.parse(data) : {};
+            } catch (e) {
+                console.warn('Failed to load historical rates:', e);
+                return {};
+            }
+        }
+
+        // Save today's rate to localStorage
+        function saveCurrentRate() {
+            const today = new Date().toISOString().split('T')[0];
+            const history = loadHistoricalRates();
+
+            // Only save if we have valid rates and haven't saved today yet
+            if (exchangeRates.krw1ToVnd && exchangeRates.vnd100ToKrw) {
+                history[today] = {
+                    krwToVnd: exchangeRates.krw1ToVnd,
+                    vndToKrw: exchangeRates.vnd100ToKrw,
+                    timestamp: Date.now()
+                };
+
+                try {
+                    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+                    console.log('Saved rate for', today, ':', history[today]);
+                } catch (e) {
+                    console.warn('Failed to save historical rate:', e);
+                }
+            }
+        }
+
+        // Get historical data for chart (from localStorage)
+        function getStoredHistoricalData(days) {
+            const history = loadHistoricalRates();
+            const sortedDates = Object.keys(history).sort();
+
+            // Get the last N days of data we have
+            const recentDates = sortedDates.slice(-days);
+
+            const labels = [];
+            const krwData = [];
+            const vndData = [];
+
+            recentDates.forEach(date => {
+                const d = new Date(date);
+                if (days <= 7) {
+                    labels.push(d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }));
+                } else {
+                    labels.push(d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }));
+                }
+
+                krwData.push(parseFloat(history[date].krwToVnd.toFixed(2)));
+                vndData.push(parseFloat(history[date].vndToKrw.toFixed(2)));
+            });
+
+            return {
+                labels,
+                krwData,
+                vndData,
+                totalDays: sortedDates.length,
+                availableDays: recentDates.length
+            };
+        }
+
+        // Get total stored days count
+        function getTotalStoredDays() {
+            const history = loadHistoricalRates();
+            return Object.keys(history).length;
+        }
+
+        // Export historical data as JSON file
+        function exportHistoricalData() {
+            const history = loadHistoricalRates();
+            const totalDays = Object.keys(history).length;
+
+            if (totalDays === 0) {
+                alert('내보낼 데이터가 없습니다. 먼저 환율 데이터를 수집해주세요.');
+                return;
+            }
+
+            const dataStr = JSON.stringify(history, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `krw_vnd_exchange_rates_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert(`✅ ${totalDays}일간의 환율 데이터를 내보냈습니다!`);
+        }
+
+        // Import historical data from JSON file
+        function importHistoricalData(file) {
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    const currentHistory = loadHistoricalRates();
+
+                    // Merge imported data with current data (imported data takes priority for same dates)
+                    let importedCount = 0;
+                    let updatedCount = 0;
+
+                    for (const date in importedData) {
+                        if (importedData[date].krwToVnd && importedData[date].vndToKrw) {
+                            if (currentHistory[date]) {
+                                updatedCount++;
+                            } else {
+                                importedCount++;
+                            }
+                            currentHistory[date] = importedData[date];
+                        }
+                    }
+
+                    // Save merged data
+                    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(currentHistory));
+
+                    const totalDays = Object.keys(currentHistory).length;
+                    alert(`✅ 데이터 불러오기 완료!\n\n새로 추가: ${importedCount}일\n업데이트: ${updatedCount}일\n총 저장: ${totalDays}일`);
+
+                    // Refresh chart
+                    initChart(currentChartDays);
+
+                } catch (error) {
+                    console.error('Import error:', error);
+                    alert('❌ 파일을 읽을 수 없습니다. 올바른 JSON 파일인지 확인해주세요.');
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        // Data button event handlers
+        document.getElementById('exportDataBtn').addEventListener('click', exportHistoricalData);
+
+        document.getElementById('importDataBtn').addEventListener('click', function () {
+            document.getElementById('importFileInput').click();
+        });
+
+        document.getElementById('importFileInput').addEventListener('change', function (e) {
+            if (e.target.files.length > 0) {
+                importHistoricalData(e.target.files[0]);
+                e.target.value = ''; // Reset input
+            }
+        });
+
+        function updateChartStats(krwData, vndData) {
+            const krwMax = Math.max(...krwData);
+            const krwMin = Math.min(...krwData);
+            const vndMax = Math.max(...vndData);
+            const vndMin = Math.min(...vndData);
+
+            document.getElementById('statHigh').textContent = krwMax.toFixed(2) + ' VND';
+            document.getElementById('statLow').textContent = krwMin.toFixed(2) + ' VND';
+            document.getElementById('statHighVnd').textContent = vndMax.toFixed(2) + ' KRW';
+            document.getElementById('statLowVnd').textContent = vndMin.toFixed(2) + ' KRW';
+        }
+
+        function initChart(days = 7) {
+            currentChartDays = days;
+            const ctx = document.getElementById('rateChart').getContext('2d');
+
+            // Get stored historical data from localStorage
+            const historicalData = getStoredHistoricalData(days);
+            const totalDays = getTotalStoredDays();
+
+            // Update chart note based on available data
+            const chartNote = document.querySelector('.chart-note');
+            if (chartNote) {
+                if (historicalData.availableDays === 0) {
+                    chartNote.textContent = `⏳ 데이터 수집 중... 매일 환율이 저장됩니다. (총 ${totalDays}일 저장됨)`;
+                } else {
+                    chartNote.textContent = `* 실제 ${historicalData.availableDays}일간 환율 데이터 (총 ${totalDays}일 저장됨)`;
+                }
+            }
+
+            // Update stats only if we have data
+            if (historicalData.availableDays > 0) {
+                updateChartStats(historicalData.krwData, historicalData.vndData);
+            } else {
+                // Show today's rate as the only data point
+                document.getElementById('statHigh').textContent = exchangeRates.krw1ToVnd.toFixed(2) + ' VND';
+                document.getElementById('statLow').textContent = exchangeRates.krw1ToVnd.toFixed(2) + ' VND';
+                document.getElementById('statHighVnd').textContent = exchangeRates.vnd100ToKrw.toFixed(2) + ' KRW';
+                document.getElementById('statLowVnd').textContent = exchangeRates.vnd100ToKrw.toFixed(2) + ' KRW';
+            }
+
+            if (rateChart) {
+                rateChart.destroy();
+            }
+
+            rateChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: historicalData.labels,
+                    datasets: [
+                        {
+                            label: '1 KRW → VND',
+                            data: historicalData.krwData,
+                            borderColor: '#4facfe',
+                            backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#4facfe',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: days <= 7 ? 5 : 3,
+                            pointHoverRadius: 7,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '100 VND → KRW',
+                            data: historicalData.vndData,
+                            borderColor: '#f5576c',
+                            backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#f5576c',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: days <= 7 ? 5 : 3,
+                            pointHoverRadius: 7,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(22, 33, 62, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.6)',
+                                maxTicksLimit: days <= 7 ? 7 : 10
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#4facfe',
+                                callback: function (value) {
+                                    return value.toFixed(2);
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: '1KRW → VND',
+                                color: '#4facfe'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: '#f5576c',
+                                callback: function (value) {
+                                    return value.toFixed(2);
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: '100VND → KRW',
+                                color: '#f5576c'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart period button handlers
+        document.querySelectorAll('.chart-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                const days = parseInt(this.dataset.days);
+                initChart(days);
+            });
+        });
+
+        // =====================
+        // Telegram Alert Functionality
+        // =====================
+        // 기본 텔레그램 설정 (하드코딩)
+        const TELEGRAM_BOT_TOKEN = '8297687133:AAHK1b_aInggvX3jUv8xseoqJqYJ774ovlM';
+        const TELEGRAM_CHAT_ID = '393163178';
+
+        let alertSettings = JSON.parse(localStorage.getItem('exchangeAlertSettings')) || {
+            rateType: 'krw',
+            targetRate: null,
+            condition: 'above'
+        };
+
+        function saveAlertSettings() {
+            const rateType = document.getElementById('rateType').value;
+            const targetRate = parseFloat(document.getElementById('targetRate').value);
+            const condition = document.getElementById('alertCondition').value;
+
+            alertSettings = { rateType, targetRate, condition };
+            localStorage.setItem('exchangeAlertSettings', JSON.stringify(alertSettings));
+
+            showAlertStatus('success', '✅ 알림 설정이 저장되었습니다!');
+        }
+
+        function loadAlertSettings() {
+            if (alertSettings) {
+                document.getElementById('rateType').value = alertSettings.rateType || 'krw';
+                document.getElementById('targetRate').value = alertSettings.targetRate || '';
+                document.getElementById('alertCondition').value = alertSettings.condition || 'above';
+                updateTargetRateLabel();
+            }
+        }
+
+        function updateTargetRateLabel() {
+            const rateType = document.getElementById('rateType').value;
+            const label = document.getElementById('targetRateLabel');
+            const input = document.getElementById('targetRate');
+
+            if (rateType === 'krw') {
+                label.textContent = '목표 환율 (VND)';
+                input.placeholder = '18.00';
+            } else {
+                label.textContent = '목표 환율 (KRW)';
+                input.placeholder = '5.60';
+            }
+        }
+
+        // Rate type change handler
+        document.getElementById('rateType').addEventListener('change', updateTargetRateLabel);
+
+        async function sendTelegramMessage(message) {
+            try {
+                const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: message,
+                        parse_mode: 'HTML'
+                    })
+                });
+
+                if (response.ok) {
+                    return true;
+                } else {
+                    const error = await response.json();
+                    console.error('Telegram API error:', error);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Failed to send Telegram message:', error);
+                return false;
+            }
+        }
+
+        async function sendTestAlert() {
+            const message = `🔔 <b>환율 알림 테스트</b>\n\n` +
+                `현재 환율: 1 KRW = ${exchangeRates.krw1ToVnd.toFixed(2)} VND\n` +
+                `100 VND = ${exchangeRates.vnd100ToKrw.toFixed(2)} KRW\n\n` +
+                `⏰ ${new Date().toLocaleString('ko-KR')}`;
+
+            const success = await sendTelegramMessage(message);
+            if (success) {
+                showAlertStatus('success', '✅ 테스트 알림을 전송했습니다!');
+            } else {
+                showAlertStatus('error', '❌ 알림 전송 실패. 설정을 확인해주세요.');
+            }
+        }
+
+        async function checkAndSendAlert() {
+            if (!alertSettings || !alertSettings.targetRate) return;
+
+            const rateType = alertSettings.rateType || 'krw';
+            const targetRate = alertSettings.targetRate;
+            const condition = alertSettings.condition;
+
+            let currentRate;
+            let rateLabel;
+            let rateUnit;
+
+            if (rateType === 'krw') {
+                currentRate = exchangeRates.krw1ToVnd;
+                rateLabel = '1 KRW';
+                rateUnit = 'VND';
+            } else {
+                currentRate = exchangeRates.vnd100ToKrw;
+                rateLabel = '100 VND';
+                rateUnit = 'KRW';
+            }
+
+            let shouldAlert = false;
+            let conditionText = '';
+
+            if (condition === 'above' && currentRate >= targetRate) {
+                shouldAlert = true;
+                conditionText = '이상';
+            } else if (condition === 'below' && currentRate <= targetRate) {
+                shouldAlert = true;
+                conditionText = '이하';
+            }
+
+            if (shouldAlert) {
+                const message = `🚨 <b>목표 환율 도달!</b>\n\n` +
+                    `📊 현재 환율: ${rateLabel} = <b>${currentRate.toFixed(2)} ${rateUnit}</b>\n` +
+                    `🎯 목표 환율: ${targetRate} ${rateUnit} ${conditionText}\n\n` +
+                    `⏰ ${new Date().toLocaleString('ko-KR')}`;
+
+                await sendTelegramMessage(message);
+            }
+        }
+
+        function showAlertStatus(type, message) {
+            const status = document.getElementById('alertStatus');
+            status.className = 'alert-status ' + type;
+            status.textContent = message;
+            setTimeout(() => {
+                status.className = 'alert-status';
+            }, 3000);
+        }
+
+        // =====================
+        // Modal Controls
+        // =====================
+        const chartModal = document.getElementById('chartModal');
+        const alertModal = document.getElementById('alertModal');
+
+        document.getElementById('openChartBtn').addEventListener('click', () => {
+            chartModal.classList.add('active');
+            setTimeout(initChart, 100);
+        });
+
+        document.getElementById('closeChartBtn').addEventListener('click', () => {
+            chartModal.classList.remove('active');
+        });
+
+        document.getElementById('openAlertBtn').addEventListener('click', () => {
+            loadAlertSettings();
+            alertModal.classList.add('active');
+        });
+
+        document.getElementById('closeAlertBtn').addEventListener('click', () => {
+            alertModal.classList.remove('active');
+        });
+
+        // Close modals when clicking overlay
+        [chartModal, alertModal].forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Alert form handlers
+        document.getElementById('alertForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveAlertSettings();
+        });
+
+        document.getElementById('testAlertBtn').addEventListener('click', () => {
+            saveAlertSettings();
+            sendTestAlert();
+        });
+
+        // =====================
+        // Initialize
+        // =====================
+        document.addEventListener('DOMContentLoaded', function () {
+            // Initial display update with default rates
+            updateRateDisplay();
+
+            // Load saved alert settings
+            loadAlertSettings();
+
+            // Fetch real rates
+            fetchExchangeRates();
+
+            // Update rates every 10 minutes and check alerts
+            setInterval(() => {
+                fetchExchangeRates();
+                checkAndSendAlert();
+            }, 10 * 60 * 1000);
+        });
+    </script>
+</body>
+
+</html>
