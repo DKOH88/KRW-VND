@@ -1,13 +1,7 @@
 {
-  "2026-02-05": {
-    "krwToVnd": 17.79,
-    "vndToKrw": 5.62,
-    "timestamp": "2026-02-05T20:00:49.607343",
-    "source": "ExchangeRate-API"
-  },
-  "2026-02-06": {
-    "krwToVnd": 17.79,
-    "vndToKrw": 5.62,
-    "timestamp": "2026-02-06T09:00:03.000906"
+  "2026-02-08": {
+    "krwToVnd": 17.7,
+    "vndToKrw": 5.65,
+    "timestamp": "2026-02-08T09:00:02.730642"
   }
 }
