@@ -20,6 +20,7 @@ import requests
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_DIR = SCRIPT_DIR
 REPO_DATA_FILE = REPO_DIR / "exchange_data" / "rates.json"
+STATE_FILE = REPO_DIR / "exchange_data" / "collector_state.json"
 LEGACY_DATA_FILE = Path(r"C:\gemini\exchange_data\rates.json")
 
 API_URL = "https://api.exchangerate-api.com/v4/latest/KRW"
@@ -43,6 +44,8 @@ def is_enabled(value: str, default: bool = True) -> bool:
 
 
 ENABLE_GIT_PUSH = is_enabled(os.getenv("ENABLE_GIT_PUSH", "1"), default=True)
+ENABLE_TELEGRAM = is_enabled(os.getenv("ENABLE_TELEGRAM", "1"), default=True)
+FORCE_TELEGRAM = is_enabled(os.getenv("FORCE_TELEGRAM", "0"), default=False)
 
 
 def ensure_parent_dir(file_path: Path) -> None:
@@ -53,7 +56,8 @@ def load_json(file_path: Path) -> dict[str, Any]:
     if not file_path.exists():
         return {}
     try:
-        with file_path.open("r", encoding="utf-8") as f:
+        # Accept UTF-8 with or without BOM.
+        with file_path.open("r", encoding="utf-8-sig") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except Exception as exc:
@@ -106,6 +110,10 @@ def fetch_exchange_rate() -> dict[str, Any] | None:
 
 
 def send_telegram_message(rate_data: dict[str, Any], total_days: int) -> bool:
+    if not ENABLE_TELEGRAM:
+        print("[INFO] ENABLE_TELEGRAM=0, skip notification.")
+        return False
+
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("[WARN] Telegram config missing, skip notification.")
         return False
@@ -272,6 +280,13 @@ def auto_commit_and_push() -> bool:
     return False
 
 
+def should_send_telegram_today(state: dict[str, Any], today: str) -> bool:
+    if FORCE_TELEGRAM:
+        return True
+    last_sent_day = str(state.get("last_telegram_date", "")).strip()
+    return last_sent_day != today
+
+
 def main() -> int:
     print("=" * 56)
     print("KRW/VND collector started")
@@ -291,6 +306,7 @@ def main() -> int:
 
     repo_history = load_json(REPO_DATA_FILE)
     legacy_history = load_json(LEGACY_DATA_FILE)
+    state = load_json(STATE_FILE)
     history = merge_histories(repo_history, legacy_history)
 
     print(f"[INFO] Loaded {len(history)} day(s) of history.")
@@ -315,7 +331,13 @@ def main() -> int:
     print(f"[INFO] 1 KRW = {rate_data['krwToVnd']} VND")
     print(f"[INFO] 100 VND = {rate_data['vndToKrw']} KRW")
 
-    send_telegram_message(rate_data, len(history))
+    if should_send_telegram_today(state, today):
+        if send_telegram_message(rate_data, len(history)):
+            state["last_telegram_date"] = today
+            state["last_telegram_ts"] = datetime.now().isoformat()
+            save_json(STATE_FILE, state)
+    else:
+        print(f"[INFO] Telegram already sent for {today}, skip duplicate.")
 
     if not auto_commit_and_push():
         return 2
