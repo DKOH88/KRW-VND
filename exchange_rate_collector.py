@@ -109,7 +109,30 @@ def fetch_exchange_rate() -> dict[str, Any] | None:
         return None
 
 
-def send_telegram_message(rate_data: dict[str, Any], total_days: int) -> bool:
+def _format_timestamp_for_message(rate_data: dict[str, Any]) -> str:
+    raw = str(rate_data.get("timestamp", "")).strip()
+    if raw:
+        try:
+            dt = datetime.fromisoformat(raw)
+            return dt.strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            pass
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
+def build_telegram_message(rate_data: dict[str, Any], total_days: int, git_status_line: str) -> str:
+    time_str = _format_timestamp_for_message(rate_data)
+    return (
+        "💱 오늘의 환율 정보\n\n"
+        f"📅 {time_str}\n\n"
+        f"💹 1 KRW = {rate_data['krwToVnd']} VND\n"
+        f"💹 100 VND = {rate_data['vndToKrw']} KRW\n\n"
+        f"📊 총 저장 데이터: {total_days}일\n"
+        f"🔗 {git_status_line}"
+    )
+
+
+def send_telegram_message(message: str) -> bool:
     if not ENABLE_TELEGRAM:
         print("[INFO] ENABLE_TELEGRAM=0, skip notification.")
         return False
@@ -118,15 +141,6 @@ def send_telegram_message(rate_data: dict[str, Any], total_days: int) -> bool:
         print("[WARN] Telegram config missing, skip notification.")
         return False
 
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    message = (
-        "<b>KRW/VND Daily Update</b>\n\n"
-        f"{now_str}\n\n"
-        f"1 KRW = <b>{rate_data['krwToVnd']} VND</b>\n"
-        f"100 VND = <b>{rate_data['vndToKrw']} KRW</b>\n\n"
-        f"Total saved days: {total_days}"
-    )
-
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         response = requests.post(
@@ -134,7 +148,6 @@ def send_telegram_message(rate_data: dict[str, Any], total_days: int) -> bool:
             json={
                 "chat_id": TELEGRAM_CHAT_ID,
                 "text": message,
-                "parse_mode": "HTML",
             },
             timeout=REQUEST_TIMEOUT_SEC,
         )
@@ -218,66 +231,66 @@ def sync_with_origin(branch: str) -> bool:
     return False
 
 
-def auto_commit_and_push() -> bool:
+def auto_commit_and_push() -> tuple[bool, str]:
     if not ENABLE_GIT_PUSH:
         print("[INFO] ENABLE_GIT_PUSH=0, skip GitHub push.")
-        return True
+        return True, "⏭ GitHub 푸시 비활성화"
 
     if shutil.which("git") is None:
         print("[ERROR] git command not found.")
-        return False
+        return False, "❌ GitHub 푸시 실패"
 
     repo_check = run_git(["rev-parse", "--is-inside-work-tree"])
     if repo_check.returncode != 0 or repo_check.stdout.strip() != "true":
         print("[ERROR] Not a git repository:", REPO_DIR)
-        return False
+        return False, "❌ GitHub 푸시 실패"
 
     rel_path = REPO_DATA_FILE.relative_to(REPO_DIR).as_posix()
 
     add_result = run_git(["add", rel_path])
     if add_result.returncode != 0:
         print("[ERROR] git add failed:", add_result.stderr.strip())
-        return False
+        return False, "❌ GitHub 푸시 실패"
 
     diff_cached = run_git(["diff", "--cached", "--quiet", "--", rel_path])
     if diff_cached.returncode == 0:
         print("[INFO] No staged changes for exchange_data/rates.json.")
-        return True
+        return True, "✅ GitHub 푸시 완료"
 
     if not ensure_git_identity():
-        return False
+        return False, "❌ GitHub 푸시 실패"
 
     branch = get_current_branch()
     if branch is None:
-        return False
+        return False, "❌ GitHub 푸시 실패"
 
     commit_msg = f"chore: update KRW/VND rate {datetime.now():%Y-%m-%d %H:%M}"
     commit_result = run_git(["commit", "-m", commit_msg])
     if commit_result.returncode != 0:
         print("[ERROR] git commit failed:", commit_result.stderr.strip() or commit_result.stdout.strip())
-        return False
+        return False, "❌ GitHub 푸시 실패"
 
     push_result = run_git(["push", "origin", branch])
     if push_result.returncode == 0:
         print("[OK] GitHub push completed.")
-        return True
+        return True, "✅ GitHub 푸시 완료"
 
     push_error = (push_result.stderr.strip() or push_result.stdout.strip()).lower()
     if "fetch first" in push_error or "non-fast-forward" in push_error or "rejected" in push_error:
         print("[WARN] Push rejected due remote updates. Retrying after pull --rebase...")
         if not sync_with_origin(branch):
-            return False
+            return False, "❌ GitHub 푸시 실패"
         push_retry = run_git(["push", "origin", branch])
         if push_retry.returncode == 0:
             print("[OK] GitHub push completed (after retry).")
-            return True
+            return True, "✅ GitHub 푸시 완료"
         print("[ERROR] git push failed after retry:")
         print(push_retry.stderr.strip() or push_retry.stdout.strip())
-        return False
+        return False, "❌ GitHub 푸시 실패"
 
     print("[ERROR] git push failed:")
     print(push_result.stderr.strip() or push_result.stdout.strip())
-    return False
+    return False, "❌ GitHub 푸시 실패"
 
 
 def should_send_telegram_today(state: dict[str, Any], today: str) -> bool:
@@ -331,15 +344,20 @@ def main() -> int:
     print(f"[INFO] 1 KRW = {rate_data['krwToVnd']} VND")
     print(f"[INFO] 100 VND = {rate_data['vndToKrw']} KRW")
 
+    push_ok, git_status_line = auto_commit_and_push()
+    if not push_ok:
+        print("[WARN] GitHub push failed; telegram message will include failure status.")
+
     if should_send_telegram_today(state, today):
-        if send_telegram_message(rate_data, len(history)):
+        telegram_message = build_telegram_message(rate_data, len(history), git_status_line)
+        if send_telegram_message(telegram_message):
             state["last_telegram_date"] = today
             state["last_telegram_ts"] = datetime.now().isoformat()
             save_json(STATE_FILE, state)
     else:
         print(f"[INFO] Telegram already sent for {today}, skip duplicate.")
 
-    if not auto_commit_and_push():
+    if not push_ok:
         return 2
 
     print("=" * 56)
